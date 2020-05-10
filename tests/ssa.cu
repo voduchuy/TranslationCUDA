@@ -16,7 +16,6 @@ if (ierr != cudaSuccess){ \
 }\
 }\
 
-
 __global__
 void init_rand_states(curandState_t *rstates) {
   curand_init(0, blockIdx.x, 0, &rstates[blockIdx.x]);
@@ -55,6 +54,7 @@ void shift_arrays(const int to_shift, const uint n, int *x_shared, int *x_shared
   if (threadIdx.x < (n - to_shift) % blockDim.x) {
     x_shared_copy[n_passes * blockDim.x + threadIdx.x] = x_shared[to_shift + n_passes * blockDim.x + threadIdx.x];
   }
+  __syncthreads();
   // make everything in x zero
   n_passes = n / blockDim.x;
   for (uint k{0}; k < n_passes; ++k) {
@@ -63,6 +63,7 @@ void shift_arrays(const int to_shift, const uint n, int *x_shared, int *x_shared
   if (threadIdx.x < n % blockDim.x) {
     x_shared[n_passes * blockDim.x + threadIdx.x] = 0;
   }
+  __syncthreads();
   // copy back from x_copy to x
   n_passes = (n - to_shift) / blockDim.x;
   for (uint k{0}; k < n_passes; ++k) {
@@ -71,6 +72,7 @@ void shift_arrays(const int to_shift, const uint n, int *x_shared, int *x_shared
   if (threadIdx.x < (n - to_shift) % blockDim.x) {
     x_shared[n_passes * blockDim.x + threadIdx.x] = x_shared_copy[n_passes * blockDim.x + threadIdx.x];
   }
+  __syncthreads();
 }
 
 __global__
@@ -148,6 +150,8 @@ void update_state(const int num_times,
         }
       }
     }
+    __syncthreads();
+
     // compute propensities
     n_passes = num_rib / blockDim.x;
     for (uint k{0}; k < n_passes; ++k) {
@@ -172,6 +176,7 @@ void update_state(const int num_times,
           );
 
     }
+    __syncthreads();
 
     // transform the propensities array to its cumsum array
     thrust::inclusive_scan(thrust::device, propensities, propensities + num_rib, propensities);
@@ -196,6 +201,7 @@ void update_state(const int num_times,
         }
       }
     }
+    __syncthreads();
     // check if we need to shift ribosomes locations so that the first nonzero is at the beginning
     if (to_shift > 0) {
       shift_arrays(to_shift, num_rib, x_shared, x_wsp);
@@ -245,7 +251,7 @@ void update_state(const int num_times,
 
 int main(int argc, char **argv) {
   const int num_rib_max = 64;
-  const int num_samples = 10;
+  const int num_samples = 1;
   const int n_excl = 3;
   const int gene_len = 10;
 
@@ -283,16 +289,16 @@ int main(int argc, char **argv) {
       + sizeof(int) // current intensity
       + sizeof(int) // time array index to output the intesnity to
   ;
-  update_state<<<num_samples, 32, shared_mem_size>>>(num_times,
-                                                     thrust::raw_pointer_cast(&t_array_device[0]),
-                                                     n_excl,
-                                                     gene_len,
-                                                     num_rib_max,
-                                                     X,
-                                                     rand_states,
-                                                     thrust::raw_pointer_cast(&rates[0]),
-                                                     thrust::raw_pointer_cast(&probe_design[0]),
-                                                     thrust::raw_pointer_cast(&intensity[0]));
+  update_state<<<num_samples, 64, shared_mem_size>>>(num_times,
+                                                      thrust::raw_pointer_cast(&t_array_device[0]),
+                                                      n_excl,
+                                                      gene_len,
+                                                      num_rib_max,
+                                                      X,
+                                                      rand_states,
+                                                      thrust::raw_pointer_cast(&rates[0]),
+                                                      thrust::raw_pointer_cast(&probe_design[0]),
+                                                      thrust::raw_pointer_cast(&intensity[0]));
   CUDACHKERR();
 
   int X_host[num_samples][num_rib_max];
