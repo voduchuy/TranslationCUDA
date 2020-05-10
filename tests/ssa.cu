@@ -25,10 +25,8 @@ void init_rand_states(curandState_t *rstates) {
 
 __device__
 int draw_uniforms(curandState_t *rstate, double *rn) {
-  if (threadIdx.x == 0) {
-    rn[0] = curand_uniform_double(rstate);
-    rn[1] = curand_uniform_double(rstate);
-  }
+  rn[0] = curand_uniform_double(rstate);
+  rn[1] = curand_uniform_double(rstate);
 }
 
 __global__
@@ -48,6 +46,34 @@ void initialize_ribosome_locations(const int num_rib, int *X) {
 
 }
 
+__device__
+void shift_arrays(const int to_shift, const uint n, int* x_shared, int* x_shared_copy){
+  // copy x[to_shift:] to x_copy
+  uint n_passes = (n - to_shift)/blockDim.x;
+  for (uint k{0}; k < n_passes;++k){
+    x_shared_copy[k*blockDim.x + threadIdx.x] = x_shared[to_shift + k*blockDim.x + threadIdx.x];
+  }
+  if (threadIdx.x < (n-to_shift)%blockDim.x){
+    x_shared_copy[n_passes*blockDim.x + threadIdx.x] = x_shared[to_shift + n_passes*blockDim.x + threadIdx.x];
+  }
+  // make everything in x zero
+  n_passes = n/blockDim.x;
+  for (uint k{0}; k < n_passes;++k){
+    x_shared[k*blockDim.x + threadIdx.x] = 0;
+  }
+  if (threadIdx.x < n%blockDim.x){
+    x_shared[n_passes*blockDim.x + threadIdx.x] = 0;
+  }
+  // copy back from x_copy to x
+  n_passes = (n - to_shift)/blockDim.x;
+  for (uint k{0}; k < n_passes;++k){
+    x_shared[k*blockDim.x + threadIdx.x] = x_shared_copy[k*blockDim.x + threadIdx.x];
+  }
+  if (threadIdx.x < (n-to_shift)%blockDim.x){
+    x_shared[n_passes*blockDim.x + threadIdx.x] = x_shared_copy[n_passes*blockDim.x + threadIdx.x];
+  }
+}
+
 __global__
 void update_state(double t_final, int num_excl, int gene_len, int num_rib, int *X, curandState_t *rstates) {
   const uint &thread_id = threadIdx.x;
@@ -60,44 +86,67 @@ void update_state(double t_final, int num_excl, int gene_len, int num_rib, int *
   double *stepsize_ptr = t_now_ptr + 1;
   double *propensities = stepsize_ptr + 1;
   int *x_shared = ( int * ) (propensities + num_rib);
+  int *x_shared_copy = x_shared + num_rib;
+  int *to_shift_ptr = x_shared_copy + num_rib;
 
   double &t_now = *t_now_ptr;
   double &stepsize = *stepsize_ptr;
+  int &to_shift = *to_shift_ptr;
 
   // INITIALIZARION
   // Init time
   if (thread_id == 0) {
-    *t_now_ptr = 0.0;
+    t_now = 0.0;
+    to_shift = 0;
   }
 
   // Copy initial ribosome locations to shared memory
-  uint n_per_thread = num_rib / blockDim.x;
-  uint idx_start = sample_id * num_rib + thread_id * n_per_thread;
-  for (int i{0}; i < n_per_thread; ++i) {
-    x_shared[i] = X[idx_start + i];
+  uint idx;
+  uint n_passes = num_rib / blockDim.x;
+
+  for (uint k{0}; k < n_passes; ++k) {
+    x_shared[k*blockDim.x + thread_id] = X[sample_id * num_rib + k*blockDim.x + thread_id];
   }
   if (thread_id < num_rib % blockDim.x) {
-    x_shared[blockDim.x * n_per_thread + thread_id] = X[sample_id * num_rib + blockDim.x * n_per_thread + thread_id];
+    x_shared[n_passes*blockDim.x + thread_id] = X[sample_id * num_rib + n_passes*blockDim.x + thread_id];
   }
 
-  int idx;
+
   // STEPPING
   while (t_now < t_final) {
     // compute propensities
-    for (int i{0}; i < n_per_thread; ++i) {
-      propensities[i] = 1.0*(x_shared[(i-1)%num_rib] - x_shared[i] > num_excl);//(x_shared[i]==0) + x_shared[i];
+    n_passes = num_rib / blockDim.x;
+    for (uint k{0}; k < n_passes; ++k) {
+      idx = k*blockDim.x + thread_id;
+      propensities[idx] = 1.0*(idx==0)
+          +
+          1.0*(idx != 0)
+          *
+              (x_shared[idx-1] - x_shared[idx] > num_excl)
+          ;
     }
     if (thread_id < num_rib % blockDim.x) {
-      idx = blockDim.x*n_per_thread + thread_id;
-      propensities[idx] = 1.0*(x_shared[(idx-1)%num_rib] - x_shared[idx] > num_excl);//(x_shared[blockDim.x*n_per_thread+thread_id]==0) +
+      idx = num_rib-num_rib%blockDim.x + thread_id;
+      propensities[idx] = 1.0*(idx == 0)
+          +
+              1.0*(idx != 0)
+              *
+              (x_shared[idx - 1] - x_shared[idx] > num_excl);//(x_shared[blockDim.x*n_per_thread+thread_id]==0) +
           //x_shared[blockDim.x * n_per_thread + thread_id];
     }
 
     // transform the propensities array to its cumsum array
     if (thread_id == 0){
+      printf("%.2e, ", propensities[0]);
       for (int i{1}; i < num_rib; ++i){
+        printf("%.2e, ", propensities[i]);
         propensities[i] += propensities[i-1];
       }
+      printf("\n");
+      for (int i{0}; i < num_rib; ++i){
+        printf("%d, ", x_shared[i]);
+      }
+      printf("\n");
     }
 
     // determine stepsize and the next ribosome to move
@@ -105,33 +154,43 @@ void update_state(double t_final, int num_excl, int gene_len, int num_rib, int *
       draw_uniforms(rstates + sample_id, rn);
       stepsize = -1.0*log(rn[0])/propensities[num_rib-1];
 
-      double tmp = 0.0;
       for (int i{0}; i < num_rib;++i){
-        tmp += propensities[i];
-        if (tmp > rn[1]*propensities[num_rib-1]){
+        if (propensities[i] >= rn[1]*propensities[num_rib-1]){
           x_shared[i] = (x_shared[i]+1) % (gene_len+1);
+          if (x_shared[i] == 0){
+            to_shift = i+1;
+          }
           break;
         }
       }
       t_now += stepsize;
     }
+    // check if we need to shift ribosomes locations so that the first nonzero is at the beginning
+    if (to_shift>0){
+      shift_arrays(to_shift, num_rib, x_shared, x_shared_copy);
+      if (thread_id == 0) {
+        to_shift = 0;
+      }
+    }
   }
 
   // COPY FINAL RIBOSOMES LOCATIONS TO GLOBAL MEMORY
-  for (int i{0}; i < n_per_thread; ++i) {
-    X[idx_start + i] = x_shared[i];
+  n_passes = num_rib / blockDim.x;
+  for (int k{0}; k < n_passes; ++k) {
+    idx = thread_id + k*blockDim.x;
+    X[sample_id * num_rib + idx] = x_shared[idx];
   }
   if (thread_id < num_rib % blockDim.x) {
-    X[sample_id * num_rib + blockDim.x * n_per_thread + thread_id] = x_shared[blockDim.x * n_per_thread + thread_id] ;
+    X[sample_id * num_rib + blockDim.x * n_passes + thread_id] = x_shared[blockDim.x * n_passes + thread_id];
   }
 }
 
 int main(int argc, char **argv) {
   const int num_rib_max = 4;
   const int num_times = 100;
-  const int num_samples = 10;
+  const int num_samples = 100;
   const int n_excl = 3;
-  const double t_final = 10.0;
+  const double t_final = 1000.0;
 
   curandState_t *rand_states;
   cudaMalloc(( void ** ) &rand_states, num_samples * sizeof(curandState_t));
@@ -149,15 +208,20 @@ int main(int argc, char **argv) {
       + 2 * sizeof(double) // for time and stepsize
       + num_rib_max * sizeof(double) // for propensities
       + num_rib_max * sizeof(int) // for ribosome locations
+      + num_rib_max * sizeof(int) // temporary space to copy ribosome locations (when shifting)
+      + sizeof(int) // index of the first ribosome
   ;
   update_state<<<num_samples, 32, shared_mem_size>>>(t_final, n_excl, 100, num_rib_max, X, rand_states);
   CUDACHKERR();
 
-  int X_host[num_samples * num_rib_max];
+  int X_host[num_samples][num_rib_max];
   cudaMemcpy(( void * ) X_host, ( void * ) X, num_samples * num_rib_max * sizeof(int), cudaMemcpyDeviceToHost);
   CUDACHKERR();
-  for (int i{0}; i < num_samples * num_rib_max; ++i) {
-    std::cout << X_host[i] << "\n";
+  for (int i{0}; i < num_samples; ++i) {
+    for (int j{0}; j < num_rib_max; ++j){
+      std::cout << X_host[i][j] << " ";
+    }
+    std::cout << "\n";
   }
 
   cudaFree(X);
