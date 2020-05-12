@@ -29,10 +29,10 @@ Here, build_type is either Release or Debug. If you omit the ```DCMAKE_INSTALL_P
 
 ### Additional build options
 
-```-DBUILD_TESTS=<ON/OFF>``` whether to build the test programs. \n
-```-DBUILD_EXAMPLES=<ON/OFF>``` whether to build the example programs.
-```-DTESTS_INSTALL_DIR=<path>``` directory to install the test programs (if chosen to build tests).
-```-DEXAMPLES_INSTALL_DIR=<path>``` directory to install the example programs (if chosen to build examples).
+```-DBUILD_TESTS=<ON/OFF>``` whether to build the test programs.\
+```-DBUILD_EXAMPLES=<ON/OFF>``` whether to build the example programs.\
+```-DTESTS_INSTALL_DIR=<path>``` directory to install the test programs (if chosen to build tests).\
+```-DEXAMPLES_INSTALL_DIR=<path>``` directory to install the example programs (if chosen to build examples).\
 
 For example, my machine is running Ubuntu Linux. If I have cloned this repository to a local folder called 'cutrans' in my home directory, and I want to install my libraries to '/usr/local/' but my examples and tests to a subfolder of Home called 'cool_programs', I'll use
 
