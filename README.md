@@ -16,7 +16,7 @@ To install this library and the example programs, clone this repository to your 
 1) Create a build directory, say 'build'. Change directory there.
 2) To generate build files, use the command
 
-```
+```Shell
   cmake -DCMAKE_BUILD_TYPE=<build_type> \
   -DCMAKE_INSTALL_PREFIX=<path to where you want to install library and header files> \
   <path to TranslationCUDA source directory>
