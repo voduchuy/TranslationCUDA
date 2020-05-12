@@ -24,11 +24,12 @@ namespace ssit{
 class CuTransSimulator {
  protected:
   int _num_samples = 1000;
-  int _num_ribosomes = 64;
+  int _num_ribosomes = 32;
   int _gene_length;
   int _num_exclusion = 1;
   bool _set_up = false;
   int _rand_seed = 0;
+  int _threads_per_trajectory = 32;
 
   thrust::host_vector<int> _initial_state;
   thrust::host_vector<double> _rates;

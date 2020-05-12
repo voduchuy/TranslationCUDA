@@ -55,8 +55,8 @@ int ssit::CuTransSimulator::SetUp() {
   _dev_states.resize(_num_ribosomes * _num_samples);
   _dev_intensity.resize(_num_samples*_time_nodes.size());
 
-  _rand_states.resize(_num_samples);
-  init_rand_states<<<_num_samples, 1>>>(thrust::raw_pointer_cast(&_rand_states[0]), _rand_seed);
+  _rand_states.resize(_num_samples*_threads_per_trajectory);
+  init_rand_states<<<_num_samples, _threads_per_trajectory>>>(thrust::raw_pointer_cast(&_rand_states[0]), _rand_seed);
   CUDACHKERR();
 
   _set_up = true;
@@ -76,13 +76,13 @@ int CuTransSimulator::Simulate() {
   if (!_set_up) SetUp();
   thrust::copy(_initial_state.begin(), _initial_state.end(), _dev_states.begin());
   if (_num_samples > 1) {
-    _replicate_array<<<_num_samples-1, 32, 0>>>(_num_ribosomes,
+    _replicate_array<<<_num_samples-1, _threads_per_trajectory, 0>>>(_num_ribosomes,
                                                 thrust::raw_pointer_cast(&_dev_states[0]),
                                                 thrust::raw_pointer_cast(&_dev_states[_num_ribosomes]));
   }
   CUDACHKERR();
 
-  size_t shared_mem_size = 2 * sizeof(double) // for the two uniform random numbers
+  size_t shared_mem_size = _threads_per_trajectory * sizeof(double) // warp-size cache for uniform random numbers
       + 2 * sizeof(double) // for time and stepsize
       + _num_ribosomes * sizeof(double) // for propensities
       + _num_ribosomes * sizeof(double) // for loading current rate values
@@ -92,9 +92,10 @@ int CuTransSimulator::Simulate() {
       + sizeof(int) // amount to shift
       + sizeof(int) // time array index to output the intesnity to
       + sizeof(int) // number of active ribosomes
+      + sizeof(int) // pointer to random number cache
   ;
 
-  update_state<<<_num_samples, 32, shared_mem_size>>>(_time_nodes.size(),
+  update_state<<<_num_samples, _threads_per_trajectory, shared_mem_size>>>(_time_nodes.size(),
                                                      thrust::raw_pointer_cast(&_dev_time_nodes[0]),
                                                      _num_exclusion,
                                                      _gene_length,
@@ -104,8 +105,8 @@ int CuTransSimulator::Simulate() {
                                                      thrust::raw_pointer_cast(&_dev_rates[0]),
                                                      thrust::raw_pointer_cast(&_dev_probe_design[0]),
                                                      thrust::raw_pointer_cast(&_dev_intensity[0]));
-  CUDACHKERR();
   cudaDeviceSynchronize();
+  CUDACHKERR();
   return 0;
 }
 

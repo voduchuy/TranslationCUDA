@@ -18,10 +18,7 @@ __global__
 void init_rand_states(curandState_t *rstates, int seed);
 
 __device__
-void draw_two_uniforms(curandState_t *rstate, double *rn);
-
-__device__
-void shift_arrays(const int to_shift, const uint n, int *x, int *wsp);
+void _blockwise_draw_uniforms(curandState_t *rstate, double *rn);
 
 __global__
 void update_state(const int num_times,

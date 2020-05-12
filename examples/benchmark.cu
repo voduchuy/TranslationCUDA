@@ -58,13 +58,16 @@ int main(int argc, char **argv) {
   simulator.SetTimeNodes(times);
   simulator.SetInitialState(rib_locations_0);
 
-
-  auto tic = std::chrono::high_resolution_clock::now();
-  simulator.Simulate();
-  cudaDeviceSynchronize();
-  auto toc = std::chrono::high_resolution_clock::now();
-  auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(toc-tic);
-  std::cout << "Simulation time is " << elapsed.count() << " miliseconds. \n";
+  for (int i{0}; i < 10; ++i){
+    auto tic = std::chrono::high_resolution_clock::now();
+    simulator.Simulate();
+    CUDACHKERR();
+    cudaDeviceSynchronize();
+    CUDACHKERR();
+    auto toc = std::chrono::high_resolution_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(toc-tic);
+    std::cout << "Batch " << i << " simulation time is " << elapsed.count() << " miliseconds. \n";
+  }
 
   thrust::host_vector<int> intensity;
   simulator.GetIntensityTrajectories(&intensity);

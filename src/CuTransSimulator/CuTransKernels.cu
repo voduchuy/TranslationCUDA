@@ -8,68 +8,7 @@ namespace ssit {
 
 __global__
 void init_rand_states(curandState_t *rstates, int seed = 0) {
-  curand_init(seed, blockIdx.x, 0, &rstates[blockIdx.x]);
-}
-
-__device__
-void draw_two_uniforms(curandState_t *rstate, double *rn) {
-  if (threadIdx.x < 2) {
-    rn[threadIdx.x] = curand_uniform_double(rstate);
-  }
-}
-
-__device__
-void shift_arrays(const int to_shift, const uint n, int *x, int *wsp) {
-  // copy x[to_shift:] to x_copy
-  uint k, idx;
-
-  k = 0;
-  while ((idx = k * blockDim.x + threadIdx.x) < n - to_shift) {
-    wsp[idx] = x[idx + to_shift];
-    k++;
-  }
-  __syncthreads();
-  // make everything in x zero
-  k = 0;
-  while ((idx = k * blockDim.x + threadIdx.x) < n) {
-    x[idx] = 0;
-    k++;
-  }
-  __syncthreads();
-  // copy back from x_copy to x
-  k = 0;
-  while ((idx = k * blockDim.x + threadIdx.x) < n - to_shift) {
-    x[idx] = wsp[idx];
-    k++;
-  }
-  __syncthreads();
-}
-
-__device__
-void shift_arrays_double(const int to_shift, const uint n, double *x, double *wsp) {
-  // copy x[to_shift:] to x_copy
-  uint k, idx;
-
-  k = 0;
-  while ((idx = k * blockDim.x + threadIdx.x) < n - to_shift) {
-    wsp[idx] = x[idx + to_shift];
-    k++;
-  }
-  __syncthreads();
-  // make everything in x zero
-  k = 0;
-  while ((idx = k * blockDim.x + threadIdx.x) < n) {
-    x[idx] = 0.0;
-    k++;
-  }
-  __syncthreads();
-  // copy back from x_copy to x
-  k = 0;
-  while ((idx = k * blockDim.x + threadIdx.x) < n - to_shift) {
-    x[idx] = wsp[idx];
-    k++;
-  }
-  __syncthreads();
+  curand_init(seed, blockIdx.x*blockDim.x + threadIdx.x, 0, &rstates[blockIdx.x*blockDim.x + threadIdx.x]);
 }
 
 __global__
@@ -85,11 +24,12 @@ void update_state(const int num_times,
                   int *intensity) {
   const uint &thread_id = threadIdx.x;
   const uint &sample_id = blockIdx.x;
+  curandState_t rstate_loc = rstates[sample_id*blockDim.x + thread_id];
 
   extern __shared__ double wsp[];
   // Partition the shared memory into appropriate arrays
   double *rn = wsp;
-  double *t_now_ptr = wsp + 2;
+  double *t_now_ptr = wsp + blockDim.x;
   double *stepsize_ptr = t_now_ptr + 1;
   double *doub_wsp = stepsize_ptr + 1;
   double *rate_caches = doub_wsp + num_rib_max;
@@ -99,6 +39,7 @@ void update_state(const int num_times,
   int *to_shift_ptr = c_caches + num_rib_max;
   int *idx_to_output = to_shift_ptr + 1;
   int *n_active_ptr = idx_to_output + 1;
+  int *i_random_ptr = n_active_ptr + 1;
 
   int *current_intensity;
   double &t_now = *t_now_ptr;
@@ -106,6 +47,7 @@ void update_state(const int num_times,
   int &to_shift = *to_shift_ptr;
   const double &t_final = t_array[num_times - 1];
   int &n_active = *n_active_ptr;
+  int &i_random = *i_random_ptr;
 
   // INITIALIZATION
   // Init time
@@ -118,7 +60,7 @@ void update_state(const int num_times,
   // Copy initial ribosome locations and rates to shared memory
   uint idx;
   uint k{0};
-  while ((idx=k * blockDim.x + thread_id) < num_rib_max) {
+  while ((idx = k * blockDim.x + thread_id) < num_rib_max) {
     x_shared[idx] = X[sample_id * num_rib_max + idx];
     rate_caches[idx] = rates[x_shared[idx]];
     c_caches[idx] = probe_design[x_shared[idx]];
@@ -132,6 +74,10 @@ void update_state(const int num_times,
     }
     n_active++;
   }
+  __syncthreads();
+  // Draw the first cache of random numbers
+  rn[thread_id] = curand_uniform_double(&rstate_loc);
+  if (thread_id == 0) i_random = 0;
   __syncthreads();
   // STEPPING
   while (t_now < t_final) {
@@ -174,15 +120,14 @@ void update_state(const int num_times,
     __syncthreads();
 
     // determine stepsize
-    draw_two_uniforms(rstates + sample_id, rn);
     if (thread_id == 0) {
-      stepsize = -1.0 * log(rn[0]) / doub_wsp[n_active - 1];
+      stepsize = log(1.0/rn[i_random]) / doub_wsp[n_active - 1];
     }
 
     // choose the ribosome to move
     k = 0;
     while ((idx = k * blockDim.x + thread_id) < n_active) {
-      x_wsp[idx] = (doub_wsp[idx] >= rn[1] * doub_wsp[n_active - 1]);
+      x_wsp[idx] = (doub_wsp[idx] >= rn[i_random + 1] * doub_wsp[n_active - 1]);
       k++;
     }
     __syncthreads();
@@ -195,12 +140,11 @@ void update_state(const int num_times,
         t_now += stepsize;
 
         x_shared[idx] = (x_shared[idx] + 1) % (gene_len + 1);
-        if ((idx == n_active - 1) & (n_active < num_rib_max)){
+        if ((idx == n_active - 1) & (n_active < num_rib_max)) {
           n_active++;
-          rate_caches[n_active-1] = rates[0];
-          c_caches[n_active-1] = probe_design[0];
-        }
-        else if (x_shared[0] == 0) {
+          rate_caches[n_active - 1] = rates[0];
+          c_caches[n_active - 1] = probe_design[0];
+        } else if (x_shared[idx] == 0) {
           to_shift = ( int ) 1;
         }
 
@@ -215,16 +159,26 @@ void update_state(const int num_times,
 
     // check if we need to shift ribosomes locations so that the first nonzero is at the beginning
     if (to_shift > 0) {
-      shift_arrays(1, n_active, x_shared, x_wsp);
-      shift_arrays(1, n_active, c_caches, x_wsp);
-      shift_arrays_double(1, n_active, rate_caches, doub_wsp);
-      n_active -= 1;
+      _blockwise_shift_arrays(1, n_active, x_shared, x_wsp);
+      _blockwise_shift_arrays(1, n_active, c_caches, x_wsp);
+      _blockwise_shift_arrays(1, n_active, rate_caches, doub_wsp);
+      n_active = max(1, n_active-1);
       if (thread_id == 0) {
         to_shift = 0;
       }
     }
     __syncthreads();
+    // Pop out the used random numbers and check that we have enough random numbers in store
+    if (thread_id == 0) i_random += 2;
+    __syncthreads();
+    if (i_random >= blockDim.x){
+      rn[thread_id] = curand_uniform_double(&rstate_loc);
+      __syncthreads();
+      if (thread_id == 0) i_random = 0;
+    }
+    __syncthreads();
   }
+
   // Compute current intensity
   k = 0;
   while ((idx = k * blockDim.x + thread_id) < n_active) {
@@ -253,5 +207,8 @@ void update_state(const int num_times,
     X[sample_id * num_rib_max + idx] = x_shared[idx];
     k++;
   }
+// Update random states
+  rstates[sample_id*blockDim.x + thread_id] = rstate_loc;
+  __syncthreads();
 }
 }

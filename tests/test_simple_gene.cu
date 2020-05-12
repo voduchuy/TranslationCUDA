@@ -44,6 +44,7 @@ int main(int argc, char **argv) {
   bool pass = true;
   for (int i{0}; i < num_samples; ++i) {
     for (int j{1}; j < num_rib_max; ++j) {
+      std::cout << final_locations[i*num_rib_max + j] << ", ";
       if ((final_locations[i * num_rib_max + j] > 0) &&
           (final_locations[i * num_rib_max + j - 1] - final_locations[i * num_rib_max + j] < n_excl)) {
         std::cout << "Ribosome locations violate exclusion constraint!\n";
@@ -51,6 +52,7 @@ int main(int argc, char **argv) {
         break;
       }
     }
+    std::cout << "\n";
     for (int j{0}; j < num_times; ++j) {
       if (intensity_host[i * num_times + j] > gene_len || intensity_host[i * num_times + j] < 0) {
         pass = false;
