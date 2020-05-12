@@ -50,7 +50,9 @@ The easiest way to run the demo program is to copy all .txt files in the folder 
 ```./demo```
 Just press enter for all questions the program ask you, until it asks about the number of samples and the ribosome exclusion parameter. Then wait for a few seconds, all trajectories will be written to a file called 'output.txt', where line i column j stores the signal intensity of sample i at the j-th timepoint.
 
-The filenames are self-explanatory. Note that 'rates.txt' contain ```(gene_len + 1)``` entries, where ```gene_len``` is the number of codons in the gene. 
+The filenames are self-explanatory. The file 'x0.txt' stores the initial ribosome locations. If x[i] = 0, that means the i-th ribosome has not been initiated yet. If x[i] = 1 then the ribosome has just been initiated.
+
+Note that 'rates.txt' contain ```(gene_len + 1)``` entries, where ```gene_len``` is the number of codons in the gene. Therefore, the first entry of rates.txt is initiation, and the rest are elongation rates.
 
 The 'c.txt' stores the probe design vector entries. Note that in my code c is assumed to also have ```(gene_len + 1)``` entry, and it always start with 0 (free ribosome emits no light). 
 
