@@ -86,6 +86,7 @@ int CuTransSimulator::Simulate() {
       + _num_ribosomes * sizeof(int) // temporary space to copy ribosome locations (when shifting)
       + sizeof(int) // amount to shift
       + sizeof(int) // time array index to output the intesnity to
+      + sizeof(int) // number of active ribosomes
   ;
 
   update_state<<<_num_samples, 32, shared_mem_size>>>(_time_nodes.size(),

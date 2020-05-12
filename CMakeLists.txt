@@ -24,6 +24,7 @@ set(CMAKE_CXX_FLAGS "-std=c++11")
 set(CMAKE_CXX_FLAGS_RELEASE "-std=c++11 -O2 -DNDEBUG")
 
 include_directories(src)
+include_directories(ext/cub-1.8.0/cub)
 
 # Decide whether to build tests and where to install them
 OPTION(BUILD_TESTS "Build tests" ON)

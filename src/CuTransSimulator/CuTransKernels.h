@@ -11,6 +11,7 @@
 #include <thrust/scan.h>
 #include <curand_kernel.h>
 #include "CuTransTemplatedKernels.h"
+#include "cub.cuh"
 
 namespace ssit{
 __global__
@@ -27,7 +28,7 @@ void update_state(const int num_times,
                   const double *t_array,
                   int num_excl,
                   int gene_len,
-                  int num_rib,
+                  int num_rib_max,
                   int *X,
                   curandState_t *rstates,
                   const double *rates,
