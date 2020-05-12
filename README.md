@@ -32,7 +32,7 @@ Here, build_type is either Release or Debug. If you omit the ```DCMAKE_INSTALL_P
 ```-DBUILD_TESTS=<ON/OFF>``` whether to build the test programs.\
 ```-DBUILD_EXAMPLES=<ON/OFF>``` whether to build the example programs.\
 ```-DTESTS_INSTALL_DIR=<path>``` directory to install the test programs (if chosen to build tests).\
-```-DEXAMPLES_INSTALL_DIR=<path>``` directory to install the example programs (if chosen to build examples).\
+```-DEXAMPLES_INSTALL_DIR=<path>``` directory to install the example programs (if chosen to build examples).
 
 For example, my machine is running Ubuntu Linux. If I have cloned this repository to a local folder called 'cutrans' in my home directory, and I want to install my libraries to '/usr/local/' but my examples and tests to a subfolder of Home called 'cool_programs', I'll use
 
@@ -46,6 +46,13 @@ cmake -DCMAKE_BUILD_TYPE=Release \
 
 ## Running the demo program
 
+The easiest way to run the demo program is to copy all .txt files in the folder 'examples/demo_sample_inputs' from the source directory into the folder that you installed the examples. Then just run 
+```./demo```
+Just press enter for all questions the program ask you, until it asks about the number of samples and the ribosome exclusion parameter. Then wait for a few seconds, all trajectories will be written to a file called 'output.txt', where line i column j stores the signal intensity of sample i at the j-th timepoint.
+
+The filenames are self-explanatory. Note that 'rates.txt' contain ```(gene_len + 1)``` entries, where ```gene_len``` is the number of codons in the gene. 
+
+The 'c.txt' stores the probe design vector entries. Note that in my code c is assumed to also have ```(gene_len + 1)``` entry, and it always start with 0 (free ribosome emits no light). 
 
 
 
