@@ -117,4 +117,9 @@ int CuTransSimulator::GetIntensityTrajectories(thrust::host_vector<int> *intensi
   (*intensity_out) = _dev_intensity;
   return 0;
 }
+int CuTransSimulator::GetFinalStates(thrust::host_vector<int> *x_out) {
+  x_out->resize(_num_samples*_num_ribosomes);
+  (*x_out) = _dev_states;
+  return 0;
+}
 

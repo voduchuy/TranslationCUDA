@@ -7,30 +7,15 @@
 namespace ssit {
 
 __global__
-void init_rand_states(curandState_t *rstates, int seed=0) {
+void init_rand_states(curandState_t *rstates, int seed = 0) {
   curand_init(seed, blockIdx.x, 0, &rstates[blockIdx.x]);
 }
 
-__global__
-void initialize_ribosome_locations(const int num_rib, int *X) {
-  const uint &thread_id = threadIdx.x;
-  const uint &sample_id = blockIdx.x;
-
-  uint ncodon_loc = num_rib / blockDim.x;
-  uint idx_start = sample_id * num_rib + thread_id * ncodon_loc;
-  for (int i{0}; i < ncodon_loc; ++i) {
-    X[idx_start + i] = 0;
-  }
-
-  if (thread_id < num_rib % blockDim.x) {
-    X[sample_id * num_rib + blockDim.x * ncodon_loc + thread_id] = 0;
-  }
-}
-
 __device__
-void draw_uniforms(curandState_t *rstate, double *rn) {
-  rn[0] = curand_uniform_double(rstate);
-  rn[1] = curand_uniform_double(rstate);
+void draw_two_uniforms(curandState_t *rstate, double *rn) {
+  if (threadIdx.x < 2) {
+    rn[threadIdx.x] = curand_uniform_double(rstate);
+  }
 }
 
 __device__
@@ -160,16 +145,15 @@ void update_state(const int num_times,
 
     // transform the propensities array to its cumsum array
     if (thread_id == 0) {
-      thrust::inclusive_scan(thrust::device, propensities, propensities + num_rib, propensities);
+      thrust::inclusive_scan(thrust::seq, propensities, propensities + num_rib, propensities);
     }
     __syncthreads();
 
     // determine stepsize
+    draw_two_uniforms(rstates + sample_id, rn);
     if (thread_id == 0) {
-      draw_uniforms(rstates + sample_id, rn);
       stepsize = -1.0 * log(rn[0]) / propensities[num_rib - 1];
     }
-    __syncthreads();
 
     // choose the ribosome to move
     n_passes = num_rib / blockDim.x;
@@ -182,7 +166,7 @@ void update_state(const int num_times,
       x_wsp[idx] = (propensities[idx] >= rn[1] * propensities[num_rib - 1]);
     }
     __syncthreads();
-    if (thread_id == 0) idx = thrust::find(thrust::device, x_wsp, x_wsp + num_rib, 1) - x_wsp;
+    if (thread_id == 0) idx = thrust::find(thrust::seq, x_wsp, x_wsp + num_rib, 1) - x_wsp;
     __syncthreads();
     if (thread_id == 0) {
       if (t_now + stepsize <= t_final) {
@@ -200,7 +184,6 @@ void update_state(const int num_times,
     if (to_shift > 0) {
       shift_arrays(to_shift, num_rib, x_shared, x_wsp);
 
-      __syncthreads();
       if (thread_id == 0) {
         to_shift = 0;
       }
@@ -218,7 +201,7 @@ void update_state(const int num_times,
     x_wsp[idx] = probe_design[x_shared[idx]];
   }
   __syncthreads();
-  if (thread_id == 0) thrust::inclusive_scan(thrust::device, x_wsp, x_wsp + num_rib, x_wsp);
+  if (thread_id == 0) thrust::inclusive_scan(thrust::seq, x_wsp, x_wsp + num_rib, x_wsp);
   __syncthreads();
   if (thread_id == 0) current_intensity = x_wsp + num_rib - 1;
   // copy current intensity to appropriate locations in global memory

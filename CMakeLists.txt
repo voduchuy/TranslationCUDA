@@ -1,84 +1,54 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.8)
-
-set(CUDA_SSA_LIBS
-        CuTransKernels
-        CuTransSimulator
-        )
-
-set(TESTS
-        ssa
-        )
-
-set(BENCHMARKS
-        )
-
-set(PROBLEMS
-
-        )
-
-set(EXTERNAL_LIBS
-        -lcusparse -lcudart -lcublas
-        )
-
-
-set(CMAKE_CUDA_COMPILER /usr/local/cuda/bin/nvcc)
 PROJECT(TranslationCUDA LANGUAGES CXX CUDA)
-
-#    set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} --compiler-options '-fPIC'")
-set(CMAKE_CUDA_FLAGS "-lineinfo -O2 -DKEXPV_VERBOSE")
 set(CMAKE_CUDA_SEPARABLE_COMPILATION true)
-set(CMAKE_CXX_FLAGS " -g -O3 -std=c++11 ")
 
-set(CMAKE_BINARY_DIR ${CMAKE_SOURCE_DIR})
+# Load some default paths for installation (e.g., /usr/local/)
+INCLUDE(GNUInstallDirs)
 
-# Where to put .a files (archive for static libraries)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+# Default build type is release
+set(default_build_type "Release")
 
-# Where to put .so files (dynamic libraries)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+if (NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE
+            STRING "Choose the type of build." FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
+            "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif ()
 
-# Where to put the executable files
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+if (NOT CMAKE_INSTALL_PREFIX)
+    set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/install CACHE PATH "Where to install the library." FORCE)
+endif (NOT CMAKE_INSTALL_PREFIX)
 
-# Set the folders to include
-include_directories(${CMAKE_SOURCE_DIR}/src)
-#include_directories(${CMAKE_SOURCE_DIR}/include)
+# Set some default flags for build types
+set(CMAKE_CXX_FLAGS "-std=c++11")
+set(CMAKE_CXX_FLAGS_RELEASE "-std=c++11 -O2 -DNDEBUG")
 
-include_directories(/usr/local/include)
-include_directories(/usr/local/cuda/include)
 include_directories(src)
 
-add_executable(dummy tests/zero_test.cpp)
-target_link_libraries(dummy)
+# Decide whether to build tests and where to install them
+OPTION(BUILD_TESTS "Build tests" ON)
+if (BUILD_TESTS)
+    set(TESTS_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/tests CACHE STRING "Installation directory for tests.")
+endif ()
 
-foreach (lib ${CUDA_SSA_LIBS})
-    add_library(${lib} src/${lib}.h src/${lib}.cu)
-    target_compile_features(${lib} PUBLIC cxx_std_11)
-    set_target_properties(${lib} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-    set_target_properties(${lib} PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    target_link_libraries(${lib} ${CUDA_STATIC_LIBS} -larmadillo)
-endforeach ()
+# Decide whether to build examples
+OPTION(BUILD_EXAMPLES "Build examples" ON)
+if (BUILD_EXAMPLES)
+    set(EXAMPLES_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/examples CACHE STRING "Installation directory for examples.")
+endif ()
 
-foreach (PROG ${TESTS})
-    add_executable(${PROG} ${CMAKE_SOURCE_DIR}/tests/${PROG}.cu)
-    target_link_libraries(${PROG} ${CUDA_SSA_LIBS} ${CUDA_STATIC_LIBS} ${EXTERNAL_LIBS})
-    target_compile_features(${PROG} PUBLIC cxx_std_11)
-    set_target_properties(${PROG} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-    set_target_properties(${PROG} PROPERTIES POSITION_INDEPENDENT_CODE ON)
-endforeach ()
-#
-#foreach (PROG ${BENCHMARKS})
-#    add_executable(${PROG} ${CMAKE_SOURCE_DIR}/benchmarks/${PROG}.cu)
-#    target_link_libraries(${PROG} ${CUDA_FSP_LIBS} ${CUDA_STATIC_LIBS} ${EXTERNAL_LIBS})
-#    target_compile_features(${PROG} PUBLIC cxx_std_11)
-#    set_target_properties(${PROG} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-#    set_target_properties(${PROG} PROPERTIES POSITION_INDEPENDENT_CODE ON)
-#endforeach ()
-#
-#foreach (PROG ${PROBLEMS})
-#    add_executable(${PROG} ${CMAKE_SOURCE_DIR}/problems/${PROG}.cu)
-#    target_link_libraries(${PROG} ${CUDA_FSP_LIBS} ${CUDA_STATIC_LIBS} ${EXTERNAL_LIBS})
-#    target_compile_features(${PROG} PUBLIC cxx_std_11)
-#    set_target_properties(${PROG} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-#    set_target_properties(${PROG} PROPERTIES POSITION_INDEPENDENT_CODE ON)
-#endforeach ()
+# Where to put the built files prior to installation--We'll put it right at the 'build' directory
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_subdirectory(src)
+
+if (BUILD_TESTS)
+    add_subdirectory(tests)
+endif()
+
+if (BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif (BUILD_EXAMPLES)
+

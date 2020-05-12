@@ -16,11 +16,8 @@ namespace ssit{
 __global__
 void init_rand_states(curandState_t *rstates, int seed);
 
-__global__
-void initialize_ribosome_locations(const int num_rib, int *X);
-
 __device__
-void draw_uniforms(curandState_t *rstate, double *rn);
+void draw_two_uniforms(curandState_t *rstate, double *rn);
 
 __device__
 void shift_arrays(const int to_shift, const uint n, int *x_shared, int *x_shared_copy);

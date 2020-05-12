@@ -57,7 +57,7 @@ class CuTransSimulator {
   int Reset();
 
   int Simulate();
-  int GetFinalStates(int* num_samples, int** x);
+  int GetFinalStates(thrust::host_vector<int> *x_out);
   int GetIntensityTrajectories(thrust::host_vector<int> *intensity_out);
 };
 }
