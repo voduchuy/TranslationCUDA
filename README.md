@@ -22,10 +22,31 @@ To install this library and the example programs, clone this repository to your 
   <path to TranslationCUDA source directory>
  ```
     
-Here, build_type is either Release or Debug.
+Here, build_type is either Release or Debug. If you omit the ```DCMAKE_INSTALL_PREFIX``` option, the library will be installed to the system default folder (on Linux/Mac, it is '/usr/local/').
 
 3) Type 'make'. Wait for the compilation to finish.
 4) Type 'make install'. In some systems, you may need administrative privilege (e.g., 'sudo' in Linux) for the files to be proprely copied to the destination folder.
+
+### Additional build options
+
+```-DBUILD_TESTS=<ON/OFF>``` whether to build the test programs.
+```-DBUILD_EXAMPLES=<ON/OFF>``` whether to build the example programs.
+```-DTESTS_INSTALL_DIR=<path>``` directory to install the test programs (if chosen to build tests).
+```-DEXAMPLES_INSTALL_DIR=<path>``` directory to install the example programs (if chosen to build examples).
+
+For example, my machine is running Ubuntu Linux. If I have cloned this repository to a local folder called 'cutrans' in my home directory, and I want to install my libraries to '/usr/local/' but my examples and tests to a subfolder of Home called 'cool_programs', I'll use
+
+```
+cmake -DCMAKE_BUILD_TYPE=Release \
+-DCMAKE_INSTALL_PREFIX=/usr/local/ \
+-DBUILD_TESTS=ON -DTESTS_INSTALL_DIR=~/cool_programs/ \
+-DBUILD_EXAMPLES=ON -DEXAMPLES_INSTALL_DIR=~/cool_programs/
+~/cutrans
+```
+
+## Running the demo program
+
+
 
 
 
