@@ -15,10 +15,11 @@ An attempt to accelerate the sampling of translation model trajectories using CU
 To install this library and the example programs, clone this repository to your local hard drive. Open a terminal/command line prompt. Follow these steps for a quick start:
 1) Create a build directory, say 'build'. Change directory there.
 2) To generate build files, use the command
-
+'''
   cmake -DCMAKE_BUILD_TYPE=<build_type> \
   -DCMAKE_INSTALL_PREFIX=<path to where you want to install library and header files> \
   <path to TranslationCUDA source directory>
+ '''
     
 Here, build_type is either Release or Debug.
 
