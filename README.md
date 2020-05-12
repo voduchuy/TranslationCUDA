@@ -29,7 +29,7 @@ Here, build_type is either Release or Debug. If you omit the ```DCMAKE_INSTALL_P
 
 ### Additional build options
 
-```-DBUILD_TESTS=<ON/OFF>``` whether to build the test programs.
+```-DBUILD_TESTS=<ON/OFF>``` whether to build the test programs. \n
 ```-DBUILD_EXAMPLES=<ON/OFF>``` whether to build the example programs.
 ```-DTESTS_INSTALL_DIR=<path>``` directory to install the test programs (if chosen to build tests).
 ```-DEXAMPLES_INSTALL_DIR=<path>``` directory to install the example programs (if chosen to build examples).
