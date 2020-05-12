@@ -21,7 +21,7 @@ __device__
 void draw_two_uniforms(curandState_t *rstate, double *rn);
 
 __device__
-void shift_arrays(const int to_shift, const uint n, int *x_shared, int *x_shared_copy);
+void shift_arrays(const int to_shift, const uint n, int *x, int *wsp);
 
 __global__
 void update_state(const int num_times,

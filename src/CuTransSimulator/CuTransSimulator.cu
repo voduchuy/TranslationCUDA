@@ -75,15 +75,20 @@ int CuTransSimulator::Reset() {
 int CuTransSimulator::Simulate() {
   if (!_set_up) SetUp();
   thrust::copy(_initial_state.begin(), _initial_state.end(), _dev_states.begin());
-  _replicate_array<<<_num_samples-1, 32, 0>>>(_num_ribosomes,
-                                              thrust::raw_pointer_cast(&_dev_states[0]),
-                                              thrust::raw_pointer_cast(&_dev_states[_num_ribosomes]));
+  if (_num_samples > 1) {
+    _replicate_array<<<_num_samples-1, 32, 0>>>(_num_ribosomes,
+                                                thrust::raw_pointer_cast(&_dev_states[0]),
+                                                thrust::raw_pointer_cast(&_dev_states[_num_ribosomes]));
+  }
+  CUDACHKERR();
 
   size_t shared_mem_size = 2 * sizeof(double) // for the two uniform random numbers
       + 2 * sizeof(double) // for time and stepsize
       + _num_ribosomes * sizeof(double) // for propensities
+      + _num_ribosomes * sizeof(double) // for loading current rate values
       + _num_ribosomes * sizeof(int) // for ribosome locations
       + _num_ribosomes * sizeof(int) // temporary space to copy ribosome locations (when shifting)
+      + _num_ribosomes * sizeof(int) // for loading probe design values
       + sizeof(int) // amount to shift
       + sizeof(int) // time array index to output the intesnity to
       + sizeof(int) // number of active ribosomes

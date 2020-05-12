@@ -31,27 +31,6 @@ void load_vec(const std::string& filename, thrust::host_vector<T>* out_vec){
   f.close();
 }
 
-template <typename T>
-void interactive_vec_input(const std::string& dir,
-                           const std::string& default_filename,
-                           const std::string& array_name,
-                           thrust::host_vector<T> *out_vec) {
-  std::string filename;
-  while (true){
-    try{
-      std::cout << "Please enter filename for "+array_name+" (default: " << default_filename << "): ";
-      std::getline(std::cin, filename);
-      if (filename.empty()){
-        filename = default_filename;
-      }
-      load_vec<T>(dir + filename, out_vec);
-      break;
-    }
-    catch(std::runtime_error& e){
-      std::cout << "Wrong path. Please enter again.\n";
-    }
-  }
-}
 
 int main(int argc, char **argv) {
   thrust::host_vector<double> times, rates;
@@ -59,38 +38,19 @@ int main(int argc, char **argv) {
   int num_samples, n_excl;
   std::string directory;
 
-  while(true){
-    try{
-      std::cout << "Please enter path to the directory that contain model information (default: cwd):";
-      std::getline(std::cin, directory);
-
-      if (!directory.empty()){
-        struct stat info;
-        if (stat(directory.c_str(), &info) != 0){
-          throw std::runtime_error("Directory does not exist.");
-        }
-        else if(! (info.st_mode & S_IFDIR)){
-          throw std::runtime_error("Not a directory.");
-        }
-        directory += "/";
-      }
-      break;
-    }
-    catch(std::runtime_error& e){
-      std::cout << e.what() << " Please try again.\n";
-    }
+  try{
+    load_vec("times.txt", &times);
+    load_vec("rates.txt", &rates);
+    load_vec("x0.txt", &rib_locations_0);
+    load_vec("c.txt", &probe_design);
+  }
+  catch(std::runtime_error& e){
+    std::cout << e.what() << std::endl;
+    return -1;
   }
 
-  interactive_vec_input(directory, "times.txt", "times", &times);
-  interactive_vec_input(directory, "rates.txt", "rates", &rates);
-  interactive_vec_input(directory, "x0.txt", "initial ribosome locations", &rib_locations_0);
-  interactive_vec_input(directory, "c.txt", "probe design", &probe_design);
-
-  std::cout << "Enter number of samples to draw: ";
-  std::cin >> num_samples;
-
-  std::cout << "Enter the exclusion parameter:";
-  std::cin >> n_excl;
+  num_samples = 1000;
+  n_excl = 7;
 
   ssit::CuTransSimulator simulator;
   simulator.SetSampleSize(num_samples);

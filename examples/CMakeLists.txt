@@ -1,5 +1,6 @@
 set(PROGRAMS
         demo
+        benchmark
         )
 
 foreach ( PROG ${PROGRAMS})
