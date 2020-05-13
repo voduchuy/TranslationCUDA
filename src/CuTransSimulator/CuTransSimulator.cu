@@ -55,8 +55,8 @@ int ssit::CuTransSimulator::SetUp() {
   _dev_states.resize(_num_ribosomes * _num_samples);
   _dev_intensity.resize(_num_samples*_time_nodes.size());
 
-  _rand_states.resize(_num_samples*_threads_per_trajectory);
-  init_rand_states<<<_num_samples, _threads_per_trajectory>>>(thrust::raw_pointer_cast(&_rand_states[0]), _rand_seed);
+  _rand_states.resize(_num_samples);
+  init_rand_states<<<_num_samples, 1>>>(thrust::raw_pointer_cast(&_rand_states[0]), _rand_seed);
   CUDACHKERR();
 
   _set_up = true;
@@ -82,15 +82,10 @@ int CuTransSimulator::Simulate() {
   }
   CUDACHKERR();
 
-  size_t shared_mem_size = _threads_per_trajectory * sizeof(double) // warp-size cache for uniform random numbers
-      + 2 * sizeof(double) // for time and stepsize
-      + _num_ribosomes * sizeof(double) // for propensities
+  size_t shared_mem_size =
+      _num_ribosomes * sizeof(double) // for propensities
       + _num_ribosomes * sizeof(int) // for ribosome locations
       + _num_ribosomes * sizeof(int) // temporary space to copy ribosome locations (when shifting)
-      + sizeof(int) // amount to shift
-      + sizeof(int) // time array index to output the intesnity to
-      + sizeof(int) // number of active ribosomes
-      + sizeof(int) // pointer to random number cache
   ;
 
   update_state<<<_num_samples, _threads_per_trajectory, shared_mem_size>>>(_time_nodes.size(),
