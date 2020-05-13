@@ -32,8 +32,7 @@ void update_state(const int num_times,
   double *t_now_ptr = wsp + blockDim.x;
   double *stepsize_ptr = t_now_ptr + 1;
   double *doub_wsp = stepsize_ptr + 1;
-  double *rate_caches = doub_wsp + num_rib_max;
-  int *x_shared = ( int * ) (rate_caches + num_rib_max);
+  int *x_shared = ( int * ) (doub_wsp + num_rib_max);
   int *x_wsp = x_shared + num_rib_max;
   int *c_caches = x_wsp + num_rib_max;
   int *to_shift_ptr = c_caches + num_rib_max;
@@ -62,7 +61,6 @@ void update_state(const int num_times,
   uint k{0};
   while ((idx = k * blockDim.x + thread_id) < num_rib_max) {
     x_shared[idx] = X[sample_id * num_rib_max + idx];
-    rate_caches[idx] = rates[x_shared[idx]];
     c_caches[idx] = probe_design[x_shared[idx]];
     k++;
   }
@@ -106,7 +104,7 @@ void update_state(const int num_times,
     // compute propensities
     k = 0;
     while ((idx = k * blockDim.x + thread_id) < n_active) {
-      doub_wsp[idx] = rate_caches[idx] * (
+      doub_wsp[idx] = rates[x_shared[idx]] * (
           (idx == 0) + (idx != 0) * (x_shared[idx - 1] - x_shared[idx] > num_excl)
       );
       k++;
@@ -139,17 +137,16 @@ void update_state(const int num_times,
       if (t_now + stepsize <= t_final) {
         t_now += stepsize;
 
-        x_shared[idx] = (x_shared[idx] + 1) % (gene_len + 1);
+        x_shared[idx] ++;
+        if (x_shared[idx] > gene_len) x_shared[idx] = 0;
         if ((idx == n_active - 1) & (n_active < num_rib_max)) {
           n_active++;
-          rate_caches[n_active - 1] = rates[0];
           c_caches[n_active - 1] = probe_design[0];
         } else if (x_shared[idx] == 0) {
           to_shift = ( int ) 1;
         }
 
         // update rates and probe design coefficients
-        rate_caches[idx] = rates[x_shared[idx]];
         c_caches[idx] = probe_design[x_shared[idx]];
       } else {
         t_now = t_final;
@@ -161,7 +158,6 @@ void update_state(const int num_times,
     if (to_shift > 0) {
       _blockwise_shift_arrays(1, n_active, x_shared, x_wsp);
       _blockwise_shift_arrays(1, n_active, c_caches, x_wsp);
-      _blockwise_shift_arrays(1, n_active, rate_caches, doub_wsp);
       n_active = max(1, n_active-1);
       if (thread_id == 0) {
         to_shift = 0;

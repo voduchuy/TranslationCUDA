@@ -58,7 +58,7 @@ int main(int argc, char **argv) {
   simulator.SetTimeNodes(times);
   simulator.SetInitialState(rib_locations_0);
 
-  for (int i{0}; i < 10; ++i){
+  for (int i{0}; i < 5; ++i){
     auto tic = std::chrono::high_resolution_clock::now();
     simulator.Simulate();
     CUDACHKERR();
@@ -68,23 +68,23 @@ int main(int argc, char **argv) {
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(toc-tic);
     std::cout << "Batch " << i << " simulation time is " << elapsed.count() << " miliseconds. \n";
   }
-
-  thrust::host_vector<int> intensity;
-  simulator.GetIntensityTrajectories(&intensity);
-
-  thrust::host_vector<int> x;
-  simulator.GetFinalStates(&x);
-
-  std::ofstream f;
-  f.open("output.txt", std::ios_base::out);
-  for (int i{0}; i < num_samples; ++i){
-    thrust::copy(intensity.begin()+i*times.size(), intensity.begin() + (i+1)*times.size(),
-                 std::ostream_iterator<int>(f, " "));
-    f << "\n";
-  }
-
-  f.close();
-
-  std::cout << "Samples are written to output.txt in current working directory.\n";
+//
+//  thrust::host_vector<int> intensity;
+//  simulator.GetIntensityTrajectories(&intensity);
+//
+//  thrust::host_vector<int> x;
+//  simulator.GetFinalStates(&x);
+//
+//  std::ofstream f;
+//  f.open("output.txt", std::ios_base::out);
+//  for (int i{0}; i < num_samples; ++i){
+//    thrust::copy(intensity.begin()+i*times.size(), intensity.begin() + (i+1)*times.size(),
+//                 std::ostream_iterator<int>(f, " "));
+//    f << "\n";
+//  }
+//
+//  f.close();
+//
+//  std::cout << "Samples are written to output.txt in current working directory.\n";
   return 0;
 }

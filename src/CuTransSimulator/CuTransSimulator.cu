@@ -85,7 +85,6 @@ int CuTransSimulator::Simulate() {
   size_t shared_mem_size = _threads_per_trajectory * sizeof(double) // warp-size cache for uniform random numbers
       + 2 * sizeof(double) // for time and stepsize
       + _num_ribosomes * sizeof(double) // for propensities
-      + _num_ribosomes * sizeof(double) // for loading current rate values
       + _num_ribosomes * sizeof(int) // for ribosome locations
       + _num_ribosomes * sizeof(int) // temporary space to copy ribosome locations (when shifting)
       + _num_ribosomes * sizeof(int) // for loading probe design values
