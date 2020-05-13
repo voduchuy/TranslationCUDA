@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
     return -1;
   }
 
-  num_samples = 1000;
+  num_samples = 5000;
   n_excl = 7;
 
   ssit::CuTransSimulator simulator;
@@ -58,7 +58,7 @@ int main(int argc, char **argv) {
   simulator.SetTimeNodes(times);
   simulator.SetInitialState(rib_locations_0);
 
-  for (int i{0}; i < 5; ++i){
+  for (int i{0}; i < 2; ++i){
     auto tic = std::chrono::high_resolution_clock::now();
     simulator.Simulate();
     CUDACHKERR();

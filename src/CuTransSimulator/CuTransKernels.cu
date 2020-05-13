@@ -34,8 +34,7 @@ void update_state(const int num_times,
   double *doub_wsp = stepsize_ptr + 1;
   int *x_shared = ( int * ) (doub_wsp + num_rib_max);
   int *x_wsp = x_shared + num_rib_max;
-  int *c_caches = x_wsp + num_rib_max;
-  int *to_shift_ptr = c_caches + num_rib_max;
+  int *to_shift_ptr = x_wsp + num_rib_max;
   int *idx_to_output = to_shift_ptr + 1;
   int *n_active_ptr = idx_to_output + 1;
   int *i_random_ptr = n_active_ptr + 1;
@@ -61,7 +60,6 @@ void update_state(const int num_times,
   uint k{0};
   while ((idx = k * blockDim.x + thread_id) < num_rib_max) {
     x_shared[idx] = X[sample_id * num_rib_max + idx];
-    c_caches[idx] = probe_design[x_shared[idx]];
     k++;
   }
   __syncthreads();
@@ -82,7 +80,7 @@ void update_state(const int num_times,
     // Compute current intensity
     k = 0;
     while ((idx = k * blockDim.x + thread_id) < n_active) {
-      x_wsp[idx] = c_caches[idx];
+      x_wsp[idx] = probe_design[x_shared[idx]];
       k++;
     }
     __syncthreads();
@@ -141,13 +139,10 @@ void update_state(const int num_times,
         if (x_shared[idx] > gene_len) x_shared[idx] = 0;
         if ((idx == n_active - 1) & (n_active < num_rib_max)) {
           n_active++;
-          c_caches[n_active - 1] = probe_design[0];
         } else if (x_shared[idx] == 0) {
           to_shift = ( int ) 1;
         }
 
-        // update rates and probe design coefficients
-        c_caches[idx] = probe_design[x_shared[idx]];
       } else {
         t_now = t_final;
       }
@@ -157,7 +152,6 @@ void update_state(const int num_times,
     // check if we need to shift ribosomes locations so that the first nonzero is at the beginning
     if (to_shift > 0) {
       _blockwise_shift_arrays(1, n_active, x_shared, x_wsp);
-      _blockwise_shift_arrays(1, n_active, c_caches, x_wsp);
       n_active = max(1, n_active-1);
       if (thread_id == 0) {
         to_shift = 0;
@@ -178,7 +172,7 @@ void update_state(const int num_times,
   // Compute current intensity
   k = 0;
   while ((idx = k * blockDim.x + thread_id) < n_active) {
-    x_wsp[idx] = c_caches[idx];
+    x_wsp[idx] = probe_design[x_shared[idx]];
     k++;
   }
   __syncthreads();

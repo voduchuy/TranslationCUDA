@@ -87,7 +87,6 @@ int CuTransSimulator::Simulate() {
       + _num_ribosomes * sizeof(double) // for propensities
       + _num_ribosomes * sizeof(int) // for ribosome locations
       + _num_ribosomes * sizeof(int) // temporary space to copy ribosome locations (when shifting)
-      + _num_ribosomes * sizeof(int) // for loading probe design values
       + sizeof(int) // amount to shift
       + sizeof(int) // time array index to output the intesnity to
       + sizeof(int) // number of active ribosomes
